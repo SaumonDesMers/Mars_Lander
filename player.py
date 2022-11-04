@@ -64,8 +64,9 @@ while True:
 		output = (0, output[1])
 		
 	# print("Player output: {}".format(output), file=sys.stderr, flush=True)
-	# print(*output)
-	print("0 0", flush=True)
+	print(*output, flush=True)
+	# print("0 4", flush=True)
+	print(0, flush=True)
 
 
 

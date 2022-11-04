@@ -4,6 +4,8 @@ import re
 import sys
 import time
 import subprocess
+import select
+import threading
 
 class State:
 	def __init__(self, x, y, hSpeed, vSpeed, fuel, rotate, power):
@@ -14,6 +16,7 @@ class State:
 		self.fuel = fuel
 		self.rotate = rotate
 		self.power = power
+		self.draw = []
 	
 	def dict(self):
 		return {
@@ -24,6 +27,7 @@ class State:
 			"fuel": int(self.fuel),
 			"rotate": int(self.rotate),
 			"power": int(self.power),
+			"draw": self.draw
 		}
 
 def gnl(io, timeout=1):
@@ -38,6 +42,35 @@ def gnl(io, timeout=1):
 	player.kill()
 	error("timeout")
 	exit(1)
+
+def gnl_timeout(io, timeout=1):
+	select_obj = select.select([io], [], [], timeout)[0]
+	if select_obj:
+		return io.readline().strip()
+	else:
+		global player
+		player.kill()
+		error("timeout")
+		exit(1)
+
+def gnl_thread(io, timeout=1) -> str:
+
+	def get_line(line):
+		line[0] = io.readline().strip()
+
+	line = [None]
+	t = threading.Thread(target=get_line, args=(line))
+	t.start()
+	t.join(timeout)
+	if t.is_alive():
+		
+		global player
+		player.kill()
+		error("timeout")
+		exit(1)
+	else:
+		return line[0]
+
 
 def error(msg):
 	print("\033[91mError:\033[0m {}".format(msg), file=sys.stderr)
@@ -75,7 +108,7 @@ def simule(data, program):
 	# execute the program in a subprocess
 	global player
 	player = subprocess.Popen(
-		["python", program],
+		["python3", program],
 		stdout=subprocess.PIPE,
 		stderr=sys.stderr,
 		stdin=subprocess.PIPE
@@ -91,12 +124,13 @@ def simule(data, program):
 	while not crossLand(state) and not outOfBounds(state):
 
 		# send the state to the program
-		# print("Game sending state...", file=sys.stderr, flush=True)
+		print("Game sending state...", file=sys.stderr, flush=True)
 		player.stdin.write("{} {} {} {} {} {} {}\n".format(int(state.x), int(state.y), int(state.hSpeed), int(state.vSpeed), int(state.fuel), int(state.rotate), int(state.power)).encode())
 		player.stdin.flush()
 
 		# read input from stdin
-		str = gnl(player.stdout).decode()
+		print("Game waiting for rotation and power...", file=sys.stderr, flush=True)
+		str = gnl_thread(player.stdout).decode()
 		if not re.match(r"^[\d-]+ \d+$", str):
 			error("invalid input format")
 			player.kill()
@@ -118,11 +152,69 @@ def simule(data, program):
 		state.power += 1 if power > state.power else -1 if power < state.power else 0
 
 		# update the state
-		state.hSpeed += math.cos(math.radians(state.rotate)) * power
-		state.vSpeed += math.sin(math.radians(state.rotate)) * power - 3.711
+		state.hSpeed += math.cos(math.radians(state.rotate - 90)) * power
+		state.vSpeed += -math.sin(math.radians(state.rotate - 90)) * power - 3.711
 		state.x += state.hSpeed
 		state.y += state.vSpeed
 		state.fuel -= power
+
+		# read the draw command
+		print("Game waiting for draw command...", file=sys.stderr, flush=True)
+		draw_n = gnl_thread(player.stdout).decode()
+		if not re.match(r"^\d+$", draw_n):
+			error("invalid draw_n format")
+			player.kill()
+			exit(1)
+		draw_n = int(draw_n)
+		print("draw_n = "+draw_n, file=sys.stderr, flush=True)
+		state.draw = []
+		for i in range(draw_n):
+			str = gnl_thread(player.stdout).decode()
+			if re.match(r"LINE \d+ \d+ \d+ \d+ \d+ #\d{6}$", str):
+				args = str.split(" ")
+				state.draw.append({
+					"type": "line",
+					"x1": int(args[1]),
+					"y1": int(args[2]),
+					"x2": int(args[3]),
+					"y2": int(args[4]),
+					"width": int(args[5]),
+					"color": args[6]
+				})
+			elif re.match(r"ELLIPSE \d+ \d+ \d+ \d+ \d+ #\d{6}$", str):
+				args = str.split(" ")
+				state.draw.append({
+					"type": "ellipse",
+					"x": int(args[1]),
+					"y": int(args[2]),
+					"width": int(args[3]),
+					"height": int(args[4]),
+					"width": int(args[5]),
+					"color": args[6]
+				})
+			elif re.match(r"CIRCLE \d+ \d+ \d+ \d+ #\d{6}$", str):
+				args = str.split(" ")
+				state.draw.append({
+					"type": "circle",
+					"x": int(args[1]),
+					"y": int(args[2]),
+					"radius": int(args[3]),
+					"width": int(args[4]),
+					"color": args[5]
+				})
+			elif re.match(r"POINT \d+ \d+ \d+ #\d{6}$", str):
+				args = str.split(" ")
+				state.draw.append({
+					"type": "point",
+					"x": int(args[1]),
+					"y": int(args[2]),
+					"width": int(args[3]),
+					"color": args[4]
+				})
+			else:
+				error("invalid draw command")
+				player.kill()
+				exit(1)
 
 		print(state.dict(), file=sys.stderr, flush=True)
 		game.append(state.dict())

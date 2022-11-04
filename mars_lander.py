@@ -3,6 +3,9 @@ from PIL import Image, ImageTk, ImageDraw
 import json
 import sys
 from simule import simule
+import math
+import random
+import time
 
 # check number of arguments
 if len(sys.argv) != 3:
@@ -89,6 +92,41 @@ def drawBg(draw):
 			width=2
 		)
 
+def drawLander(draw, game):
+	size = 120 * ration
+	x = game["x"] * ration
+	y = (playground_height - game["y"]) * ration
+	rotate = game["rotate"]
+	landerRotate = math.radians(rotate - 90)
+	# draw triangle for lander
+	draw.polygon(
+		(
+			x + size*math.cos(landerRotate),
+			y + size*math.sin(landerRotate),
+			x + size/3 * math.cos(landerRotate + math.radians(90)),
+			y + size/3 * math.sin(landerRotate + math.radians(90)),
+			x + size/3 * math.cos(landerRotate + math.radians(-90)),
+			y + size/3 * math.sin(landerRotate + math.radians(-90))
+		),
+		outline="#ffffff",
+		width=2
+	)
+	# draw elipse for power
+	random.seed(time.time())
+	w, h = int(size/3), int(10*game["power"] * (1 + 0.3 * random.random()))
+	elipseImg = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+	drawElipse = ImageDraw.Draw(elipseImg)
+	drawElipse.ellipse((0, 0, w-1, h-1), outline="#ffffff", width=2)
+	elipseImg = elipseImg.rotate(-rotate, expand=True, fillcolor=(0, 0, 0, 0))
+	draw.bitmap(
+		(
+			x + h/2 * math.cos(math.radians(rotate + 90)) - elipseImg.width/2,
+			y + h/2 * math.sin(math.radians(rotate + 90)) - elipseImg.height/2
+		),
+		elipseImg,
+		fill="#ffffff"
+	)
+
 # create the images
 ration = 0.2
 cnv_width = int(playground_width*ration)
@@ -100,16 +138,7 @@ for i in range(picNb):
 	image = Image.new('RGB', (cnv_width, cnv_height), (0, 0, 0))
 	draw = ImageDraw.Draw(image)
 	drawBg(draw)
-	# draw player
-	draw.ellipse(
-		(
-			game[i]["x"]*ration - 5,
-			playground_height*ration - game[i]["y"]*ration - 5,
-			game[i]["x"]*ration + 5,
-			playground_height*ration - game[i]["y"]*ration + 5
-		),
-		fill="#ff0000"
-	)
+	drawLander(draw, game[i])
 	pic.append(image)
 
 # create slider for video
@@ -122,6 +151,8 @@ def key(event):
 		slider.set(slider.get() - 1)
 	elif event.keysym == 'Right':
 		slider.set(slider.get() + 1)
+	elif event.keysym == 'Escape':
+		root.destroy()
 root.bind_all('<Key>', key)
 
 # update slider with mouse wheel

@@ -6,6 +6,10 @@ import time
 import subprocess
 import select
 import threading
+import queue
+
+def error(msg):
+	print("\033[91mError:\033[0m {}".format(msg), file=sys.stderr)
 
 class State:
 	def __init__(self, x, y, hSpeed, vSpeed, fuel, rotate, power):
@@ -16,7 +20,7 @@ class State:
 		self.fuel = fuel
 		self.rotate = rotate
 		self.power = power
-		self.draw = []
+		self.drawCmd = []
 	
 	def dict(self):
 		return {
@@ -27,63 +31,37 @@ class State:
 			"fuel": int(self.fuel),
 			"rotate": int(self.rotate),
 			"power": int(self.power),
-			"draw": self.draw
+			"drawCmd": self.drawCmd
 		}
 
-def gnl(io, timeout=1):
-	# print("Game waiting for input...", file=sys.stderr, flush=True)
-	start = time.time()
-	while time.time() - start < timeout:
-		line = io.readline().strip()
-		if line:
-			# print("Game read: {}".format(line), file=sys.stderr, flush=True)
-			return line
-	global player
-	player.kill()
-	error("timeout")
-	exit(1)
 
-def gnl_timeout(io, timeout=1):
-	select_obj = select.select([io], [], [], timeout)[0]
-	if select_obj:
-		return io.readline().strip()
-	else:
-		global player
-		player.kill()
-		error("timeout")
-		exit(1)
+class NonBlockingStreamReader:
+	def __init__(self, stream):
+		self._s = stream
+		self._q = queue.Queue()
 
-def gnl_thread(io, timeout=1) -> str:
+		def _populateQueue(stream, queue):
+			while True:
+				line = stream.readline()
+				if line:
+					queue.put(line)
+				else:
+					# Either closed or blocked
+					time.sleep(0.1)
 
-	def get_line(line):
-		line[0] = io.readline().strip()
+		self._t = threading.Thread(target=_populateQueue, args=(self._s, self._q))
+		self._t.daemon = True
+		self._t.start()  # start collecting lines from the stream
 
-	line = [None]
-	t = threading.Thread(target=get_line, args=(line))
-	t.start()
-	t.join(timeout)
-	if t.is_alive():
-		
-		global player
-		player.kill()
-		error("timeout")
-		exit(1)
-	else:
-		return line[0]
+	def readline(self, timeout=1):
+		try:
+			return self._q.get(block=timeout is not None, timeout=timeout)
+		except queue.Empty:
+			global player
+			player.kill()
+			error("Your program timed out.")
+			sys.exit(1)
 
-
-def error(msg):
-	print("\033[91mError:\033[0m {}".format(msg), file=sys.stderr)
-
-def cartToPolar(x, y):
-	r = math.sqrt(x**2 + y**2)
-	theta = math.atan2(y, x)
-	return r, theta
-
-def polarToCart(r, theta):
-	x = r * math.cos(theta)
-	y = r * math.sin(theta)
-	return x, y
 
 def crossLand(state):
 	global land
@@ -114,6 +92,9 @@ def simule(data, program):
 		stdin=subprocess.PIPE
 	)
 
+	# create a non-blocking reader for the subprocess
+	io = NonBlockingStreamReader(player.stdout)
+
 	# send the surface to the program
 	# print("Game sending surface...", file=sys.stderr, flush=True)
 	player.stdin.write("{}\n".format(len(land)).encode())
@@ -124,13 +105,13 @@ def simule(data, program):
 	while not crossLand(state) and not outOfBounds(state):
 
 		# send the state to the program
-		print("Game sending state...", file=sys.stderr, flush=True)
+		# print("Game sending state...", file=sys.stderr, flush=True)
 		player.stdin.write("{} {} {} {} {} {} {}\n".format(int(state.x), int(state.y), int(state.hSpeed), int(state.vSpeed), int(state.fuel), int(state.rotate), int(state.power)).encode())
 		player.stdin.flush()
 
 		# read input from stdin
-		print("Game waiting for rotation and power...", file=sys.stderr, flush=True)
-		str = gnl_thread(player.stdout).decode()
+		# print("Game waiting for rotation and power...", file=sys.stderr, flush=True)
+		str = io.readline().decode()
 		if not re.match(r"^[\d-]+ \d+$", str):
 			error("invalid input format")
 			player.kill()
@@ -159,20 +140,19 @@ def simule(data, program):
 		state.fuel -= power
 
 		# read the draw command
-		print("Game waiting for draw command...", file=sys.stderr, flush=True)
-		draw_n = gnl_thread(player.stdout).decode()
+		# print("Game waiting for draw command...", file=sys.stderr, flush=True)
+		draw_n = io.readline().decode()
 		if not re.match(r"^\d+$", draw_n):
-			error("invalid draw_n format")
+			error("invalid number of draw command")
 			player.kill()
 			exit(1)
 		draw_n = int(draw_n)
-		print("draw_n = "+draw_n, file=sys.stderr, flush=True)
-		state.draw = []
+		state.drawCmd = []
 		for i in range(draw_n):
-			str = gnl_thread(player.stdout).decode()
-			if re.match(r"LINE \d+ \d+ \d+ \d+ \d+ #\d{6}$", str):
+			str = io.readline().decode()
+			if re.match(r"LINE \d+ \d+ \d+ \d+ \d+ #[\da-fA-F]{6}$", str):
 				args = str.split(" ")
-				state.draw.append({
+				state.drawCmd.append({
 					"type": "line",
 					"x1": int(args[1]),
 					"y1": int(args[2]),
@@ -181,9 +161,9 @@ def simule(data, program):
 					"width": int(args[5]),
 					"color": args[6]
 				})
-			elif re.match(r"ELLIPSE \d+ \d+ \d+ \d+ \d+ #\d{6}$", str):
+			elif re.match(r"ELLIPSE \d+ \d+ \d+ \d+ \d+ #[\da-fA-F]{6}$", str):
 				args = str.split(" ")
-				state.draw.append({
+				state.drawCmd.append({
 					"type": "ellipse",
 					"x": int(args[1]),
 					"y": int(args[2]),
@@ -192,9 +172,9 @@ def simule(data, program):
 					"width": int(args[5]),
 					"color": args[6]
 				})
-			elif re.match(r"CIRCLE \d+ \d+ \d+ \d+ #\d{6}$", str):
+			elif re.match(r"CIRCLE \d+ \d+ \d+ \d+ #[\da-fA-F]{6}$", str):
 				args = str.split(" ")
-				state.draw.append({
+				state.drawCmd.append({
 					"type": "circle",
 					"x": int(args[1]),
 					"y": int(args[2]),
@@ -202,9 +182,9 @@ def simule(data, program):
 					"width": int(args[4]),
 					"color": args[5]
 				})
-			elif re.match(r"POINT \d+ \d+ \d+ #\d{6}$", str):
+			elif re.match(r"POINT \d+ \d+ \d+ #[\da-fA-F]{6}$", str):
 				args = str.split(" ")
-				state.draw.append({
+				state.drawCmd.append({
 					"type": "point",
 					"x": int(args[1]),
 					"y": int(args[2]),

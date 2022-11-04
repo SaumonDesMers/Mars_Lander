@@ -83,10 +83,10 @@ def drawBg(draw):
 	for i in range(data["surface_n"] - 1):
 		draw.line(
 			(
-				data["land"][i]["x"]*ration,
-				playground_height*ration - data["land"][i]["y"]*ration,
-				data["land"][i + 1]["x"]*ration,
-				playground_height*ration - data["land"][i + 1]["y"]*ration
+				data["land"][i]["x"] * ration,
+				playground_height * ration - data["land"][i]["y"] * ration,
+				data["land"][i + 1]["x"] * ration,
+				playground_height * ration - data["land"][i + 1]["y"] * ration
 			),
 			fill="#ffffff",
 			width=2
@@ -127,10 +127,56 @@ def drawLander(draw, game):
 		fill="#ffffff"
 	)
 
+def execDrawCmd(draw, cmds):
+	for cmd in cmds:
+		if cmd["type"] == "line":
+			draw.line(
+				(
+					cmd["x1"] * ration,
+					(playground_height - cmd["y1"]) * ration,
+					cmd["x2"] * ration,
+					(playground_height - cmd["y2"]) * ration
+				),
+				fill=cmd["color"],
+				width=cmd["width"]
+			)
+		elif cmd["type"] == "ellipse":
+			draw.ellipse(
+				(
+					cmd["x1"] * ration,
+					(playground_height - cmd["y1"]) * ration,
+					cmd["x2"] * ration,
+					(playground_height - cmd["y2"]) * ration
+				),
+				outline=cmd["color"],
+				width=cmd["width"]
+			)
+		elif cmd["type"] == "circle":
+			draw.ellipse(
+				(
+					cmd["x"] * ration - cmd["r"] * ration,
+					(playground_height - cmd["y"]) * ration - cmd["r"] * ration,
+					cmd["x"] * ration + cmd["r"] * ration,
+					(playground_height - cmd["y"]) * ration + cmd["r"] * ration
+				),
+				outline=cmd["color"],
+				width=cmd["width"]
+			)
+		elif cmd["type"] == "point":
+			draw.ellipse(
+				(
+					cmd["x"] * ration - cmd["widht"] * ration,
+					(playground_height - cmd["y"]) * ration - cmd["widht"] * ration,
+					cmd["x"] * ration + cmd["widht"] * ration,
+					(playground_height - cmd["y"]) * ration + cmd["widht"] * ration
+				),
+				fill=cmd["color"]
+			)
+
 # create the images
 ration = 0.2
-cnv_width = int(playground_width*ration)
-cnv_height = int(playground_height*ration)
+cnv_width = int(playground_width * ration)
+cnv_height = int(playground_height * ration)
 pic = []
 game = simule(data, sys.argv[2])
 picNb = len(game)
@@ -139,6 +185,7 @@ for i in range(picNb):
 	draw = ImageDraw.Draw(image)
 	drawBg(draw)
 	drawLander(draw, game[i])
+	execDrawCmd(draw, game[i]["drawCmd"])
 	pic.append(image)
 
 # create slider for video

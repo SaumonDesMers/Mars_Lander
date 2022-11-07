@@ -22,6 +22,16 @@ class State:
 		self.power = power
 		self.drawCmd = []
 	
+	def next(self, inputRotate, inputPower):
+		nextRotate = self.rotate + min(15, max(-15, inputRotate - self.rotate))
+		nextPower = self.power + (1 if inputPower > self.power else -1 if inputPower < self.power else 0)
+		nextHSpeed = self.hSpeed + math.cos(math.radians(nextRotate - 90)) * nextPower
+		nextVSpeed = self.vSpeed - math.sin(math.radians(nextRotate - 90)) * nextPower - 3.711
+		nextX = self.x + nextHSpeed
+		nextY = self.y + nextVSpeed
+		nextFuel = self.fuel - nextPower
+		return State(nextX, nextY, nextHSpeed, nextVSpeed, nextFuel, nextRotate, nextPower)
+	
 	def dict(self):
 		return {
 			"x": int(self.x),
@@ -128,16 +138,7 @@ def simule(data, program):
 			player.kill()
 			exit(1)
 
-		# update the rotation and power
-		state.rotate += min(15, max(-15, rotate - state.rotate))
-		state.power += 1 if power > state.power else -1 if power < state.power else 0
-
-		# update the state
-		state.hSpeed += math.cos(math.radians(state.rotate - 90)) * power
-		state.vSpeed += -math.sin(math.radians(state.rotate - 90)) * power - 3.711
-		state.x += state.hSpeed
-		state.y += state.vSpeed
-		state.fuel -= power
+		state = state.next(rotate, power)
 
 		# read the draw command
 		# print("Game waiting for draw command...", file=sys.stderr, flush=True)
@@ -150,7 +151,7 @@ def simule(data, program):
 		state.drawCmd = []
 		for i in range(draw_n):
 			str = io.readline().decode()
-			if re.match(r"LINE \d+ \d+ \d+ \d+ \d+ #[\da-fA-F]{6}$", str):
+			if re.match(r"LINE [\d-]+ [\d-]+ [\d-]+ [\d-]+ \d+ #[\da-fA-F]{6}$", str):
 				args = str.split(" ")
 				state.drawCmd.append({
 					"type": "line",
@@ -161,7 +162,7 @@ def simule(data, program):
 					"width": int(args[5]),
 					"color": args[6]
 				})
-			elif re.match(r"ELLIPSE \d+ \d+ \d+ \d+ \d+ #[\da-fA-F]{6}$", str):
+			elif re.match(r"ELLIPSE [\d-]+ [\d-]+ [\d-]+ [\d-]+ \d+ #[\da-fA-F]{6}$", str):
 				args = str.split(" ")
 				state.drawCmd.append({
 					"type": "ellipse",
@@ -172,7 +173,7 @@ def simule(data, program):
 					"width": int(args[5]),
 					"color": args[6]
 				})
-			elif re.match(r"CIRCLE \d+ \d+ \d+ \d+ #[\da-fA-F]{6}$", str):
+			elif re.match(r"CIRCLE [\d-]+ [\d-]+ \d+ \d+ #[\da-fA-F]{6}$", str):
 				args = str.split(" ")
 				state.drawCmd.append({
 					"type": "circle",
@@ -182,7 +183,7 @@ def simule(data, program):
 					"width": int(args[4]),
 					"color": args[5]
 				})
-			elif re.match(r"POINT \d+ \d+ \d+ #[\da-fA-F]{6}$", str):
+			elif re.match(r"POINT [\d-]+ [\d-]+ \d+ #[\da-fA-F]{6}$", str):
 				args = str.split(" ")
 				state.drawCmd.append({
 					"type": "point",
@@ -192,11 +193,10 @@ def simule(data, program):
 					"color": args[4]
 				})
 			else:
-				error("invalid draw command")
+				error("invalid draw command: {}".format(str))
 				player.kill()
 				exit(1)
 
-		print(state.dict(), file=sys.stderr, flush=True)
 		game.append(state.dict())
 	
 	player.kill()

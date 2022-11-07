@@ -1,5 +1,5 @@
 from tkinter import *
-from PIL import Image, ImageTk, ImageDraw
+from PIL import Image, ImageTk, ImageDraw, ImageFont
 import json
 import sys
 from simule import simule
@@ -91,6 +91,15 @@ def drawBg(draw):
 			fill="#ffffff",
 			width=2
 		)
+
+def drawTextParams(draw, game, i):
+	draw.text((10, playground_height * ration - 60), "Step: {}".format(i), fill="#ffffff")
+	draw.text((10, playground_height * ration - 40), "x: {}".format(game["x"]), fill="#ffffff")
+	draw.text((10, playground_height * ration - 20), "y: {}".format(game["y"]), fill="#ffffff")
+	draw.text((70, playground_height * ration - 40), "vSpeed: {}".format(game["vSpeed"]), fill="#ffffff")
+	draw.text((70, playground_height * ration - 20), "hSpeed: {}".format(game["hSpeed"]), fill="#ffffff")
+	draw.text((150, playground_height * ration - 40), "fuel: {}".format(game["fuel"]), fill="#ffffff")
+	draw.text((150, playground_height * ration - 20), "rotate: {}".format(game["rotate"]), fill="#ffffff")
 
 def drawLander(draw, game):
 	size = 120 * ration
@@ -184,6 +193,7 @@ for i in range(picNb):
 	image = Image.new('RGB', (cnv_width, cnv_height), (0, 0, 0))
 	draw = ImageDraw.Draw(image)
 	drawBg(draw)
+	drawTextParams(draw, game[i], i)
 	drawLander(draw, game[i])
 	execDrawCmd(draw, game[i]["drawCmd"])
 	pic.append(image)

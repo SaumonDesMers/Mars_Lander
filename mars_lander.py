@@ -9,7 +9,7 @@ import time
 
 # check number of arguments
 if len(sys.argv) != 3:
-	print("Usage: python3 {} <input.json> <program>".format(sys.argv[0]))
+	print("Usage: python3 {} <your program> <input.json>".format(sys.argv[0]))
 	exit(1)
 
 def error(msg):
@@ -66,7 +66,7 @@ def inputCheck():
 		exit(1)
 
 try:
-	data = json.load(open(sys.argv[1], "r"))
+	data = json.load(open(sys.argv[2], "r"))
 	inputCheck()
 except Exception as e:
 	error("could not parse input: {}".format(e))
@@ -106,7 +106,7 @@ def drawLander(draw, game):
 	x = game["x"] * ration
 	y = (playground_height - game["y"]) * ration
 	rotate = game["rotate"]
-	landerRotate = math.radians(rotate - 90)
+	landerRotate = math.radians(-rotate)
 	# draw triangle for lander
 	draw.polygon(
 		(
@@ -117,20 +117,20 @@ def drawLander(draw, game):
 			x + size/3 * math.cos(landerRotate + math.radians(-90)),
 			y + size/3 * math.sin(landerRotate + math.radians(-90))
 		),
-		outline="#ffffff",
+		outline="#dddddd",
 		width=2
 	)
 	# draw elipse for power
 	random.seed(time.time())
-	w, h = int(size/3), int(10*game["power"] * (1 + 0.3 * random.random()))
+	w, h = int(size / 3), int(10 * game["power"] * (1 + 0.3 * random.random()))
 	elipseImg = Image.new("RGBA", (w, h), (0, 0, 0, 0))
 	drawElipse = ImageDraw.Draw(elipseImg)
-	drawElipse.ellipse((0, 0, w-1, h-1), outline="#ffffff", width=2)
-	elipseImg = elipseImg.rotate(-rotate, expand=True, fillcolor=(0, 0, 0, 0))
+	drawElipse.ellipse((0, 0, w-1, h-1), outline="#dddddd", width=2)
+	elipseImg = elipseImg.rotate(rotate+90, expand=True, fillcolor=(0, 0, 0, 0))
 	draw.bitmap(
 		(
-			x + h/2 * math.cos(math.radians(rotate + 90)) - elipseImg.width/2,
-			y + h/2 * math.sin(math.radians(rotate + 90)) - elipseImg.height/2
+			x - h/2 * math.cos(math.radians(rotate)) - elipseImg.width/2,
+			y + h/2 * math.sin(math.radians(rotate)) - elipseImg.height/2
 		),
 		elipseImg,
 		fill="#ffffff"
@@ -174,10 +174,10 @@ def execDrawCmd(draw, cmds):
 		elif cmd["type"] == "point":
 			draw.ellipse(
 				(
-					cmd["x"] * ration - cmd["widht"] * ration,
-					(playground_height - cmd["y"]) * ration - cmd["widht"] * ration,
-					cmd["x"] * ration + cmd["widht"] * ration,
-					(playground_height - cmd["y"]) * ration + cmd["widht"] * ration
+					cmd["x"] * ration - cmd["width"] * ration,
+					(playground_height - cmd["y"]) * ration - cmd["width"] * ration,
+					cmd["x"] * ration + cmd["width"] * ration,
+					(playground_height - cmd["y"]) * ration + cmd["width"] * ration
 				),
 				fill=cmd["color"]
 			)
@@ -187,7 +187,7 @@ ration = 0.2
 cnv_width = int(playground_width * ration)
 cnv_height = int(playground_height * ration)
 pic = []
-game = simule(data, sys.argv[2])
+game = simule(data, sys.argv[1])
 picNb = len(game)
 for i in range(picNb):
 	image = Image.new('RGB', (cnv_width, cnv_height), (0, 0, 0))

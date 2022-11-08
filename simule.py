@@ -11,40 +11,6 @@ import queue
 def error(msg):
 	print("\033[91mError:\033[0m {}".format(msg), file=sys.stderr)
 
-class State:
-	def __init__(self, x, y, hSpeed, vSpeed, fuel, rotate, power):
-		self.x = x
-		self.y = y
-		self.hSpeed = hSpeed
-		self.vSpeed = vSpeed
-		self.fuel = fuel
-		self.rotate = rotate
-		self.power = power
-		self.drawCmd = []
-	
-	def next(self, inputRotate, inputPower):
-		nextRotate = self.rotate + min(15, max(-15, inputRotate - self.rotate))
-		nextPower = self.power + (1 if inputPower > self.power else -1 if inputPower < self.power else 0)
-		nextHSpeed = self.hSpeed + math.cos(math.radians(nextRotate - 90)) * nextPower
-		nextVSpeed = self.vSpeed - math.sin(math.radians(nextRotate - 90)) * nextPower - 3.711
-		nextX = self.x + nextHSpeed
-		nextY = self.y + nextVSpeed
-		nextFuel = self.fuel - nextPower
-		return State(nextX, nextY, nextHSpeed, nextVSpeed, nextFuel, nextRotate, nextPower)
-	
-	def dict(self):
-		return {
-			"x": int(self.x),
-			"y": int(self.y),
-			"hSpeed": int(self.hSpeed),
-			"vSpeed": int(self.vSpeed),
-			"fuel": int(self.fuel),
-			"rotate": int(self.rotate),
-			"power": int(self.power),
-			"drawCmd": self.drawCmd
-		}
-
-
 class NonBlockingStreamReader:
 	def __init__(self, stream):
 		self._s = stream
@@ -72,6 +38,45 @@ class NonBlockingStreamReader:
 			error("Your program timed out.")
 			sys.exit(1)
 
+class State:
+	def __init__(self, x, y, hSpeed, vSpeed, fuel, rotate, power):
+		self.x = x
+		self.y = y
+		self.hSpeed = hSpeed
+		self.vSpeed = vSpeed
+		self.fuel = fuel
+		self.rotate = rotate
+		self.power = power
+		self.drawCmd = []
+	
+	def next(self, inputRotate, inputPower):
+		nextRotate = self.rotate + min(15, max(-15, inputRotate - self.rotate))
+		nextPower = self.power + (1 if inputPower > self.power else -1 if inputPower < self.power else 0)
+		nextPower = min(nextPower, self.fuel)
+		nextHSpeed = self.hSpeed + math.cos(math.radians(nextRotate)) * nextPower
+		nextVSpeed = self.vSpeed + math.sin(math.radians(nextRotate)) * nextPower - 3.711
+		nextX = self.x + nextHSpeed
+		nextY = self.y + nextVSpeed
+		nextFuel = self.fuel - nextPower
+		return State(nextX, nextY, nextHSpeed, nextVSpeed, nextFuel, nextRotate, nextPower)
+	
+	def dict(self):
+		return {
+			"x": int(self.x),
+			"y": int(self.y),
+			"hSpeed": int(self.hSpeed),
+			"vSpeed": int(self.vSpeed),
+			"fuel": int(self.fuel),
+			"rotate": int(self.rotate),
+			"power": int(self.power),
+			"drawCmd": self.drawCmd
+		}
+
+	def __str__(self):
+		return "State(x={}, y={}, hSpeed={}, vSpeed={}, fuel={}, rotate={}, power={})".format(
+			int(self.x), int(self.y), int(self.hSpeed), int(self.vSpeed), int(self.fuel), int(self.rotate), int(self.power)
+		)
+
 
 def crossLand(state):
 	global land
@@ -90,6 +95,7 @@ def outOfBounds(state):
 def simule(data, program):
 	global land
 	land = data["land"]
+	data["start"]["rotate"] += 90
 	state = State(**data["start"])
 	game = [state.dict()]
 
@@ -126,8 +132,8 @@ def simule(data, program):
 			error("invalid input format")
 			player.kill()
 			exit(1)
+		
 		rotate, power = map(int, str.split(" "))
-
 		# check input values
 		if not -90 <= rotate <= 90:
 			error("invalid rotate value")
@@ -138,7 +144,11 @@ def simule(data, program):
 			player.kill()
 			exit(1)
 
-		state = state.next(rotate, power)
+		# update power if not enough fuel
+		# if state.fuel < power:
+		# 	power = max(state.fuel, 0)
+
+		state = state.next(rotate + 90, power)
 
 		# read the draw command
 		# print("Game waiting for draw command...", file=sys.stderr, flush=True)

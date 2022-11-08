@@ -14,7 +14,7 @@
 		"hSpeed": -50,
 		"vSpeed": 0,
 		"fuel": 1000,
-		"rotate": 45,
+		"rotate": -45,
 		"power": 4
 	}
 }

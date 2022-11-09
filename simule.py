@@ -62,21 +62,29 @@ class State:
 	
 	def dict(self):
 		return {
-			"x": int(self.x),
-			"y": int(self.y),
-			"hSpeed": int(self.hSpeed),
-			"vSpeed": int(self.vSpeed),
-			"fuel": int(self.fuel),
-			"rotate": int(self.rotate),
-			"power": int(self.power),
+			"x": round(self.x),
+			"y": round(self.y),
+			"hSpeed": round(self.hSpeed),
+			"vSpeed": round(self.vSpeed),
+			"fuel": round(self.fuel),
+			"rotate": round(self.rotate),
+			"power": round(self.power),
 			"drawCmd": self.drawCmd
 		}
 
 	def __str__(self):
 		return "State(x={}, y={}, hSpeed={}, vSpeed={}, fuel={}, rotate={}, power={})".format(
-			int(self.x), int(self.y), int(self.hSpeed), int(self.vSpeed), int(self.fuel), int(self.rotate), int(self.power)
+			round(self.x),
+			round(self.y),
+			round(self.hSpeed),
+			round(self.vSpeed),
+			round(self.fuel),
+			round(self.rotate),
+			round(self.power)
 		)
 
+def round(n):
+	return int(n + (0.5 if n > 0 else -0.5))
 
 def crossLand(state):
 	global land
@@ -94,7 +102,7 @@ def outOfBounds(state):
 
 def hasLanded(s):
 	global landingSurface
-	return s.y <= landingSurface["y"] and landingSurface["x1"] <= s.x <= landingSurface["x2"] and abs(s.hSpeed) <= 20 and abs(s.vSpeed) <= 40 and s.rotate == 90
+	return s.y <= landingSurface["y"] and landingSurface["x1"] <= s.x <= landingSurface["x2"] and abs(int(s.hSpeed)) <= 20 and abs(int(s.vSpeed)) <= 40 and s.rotate == 90
 
 def simule(data, program):
 	global land
@@ -137,7 +145,7 @@ def simule(data, program):
 	while True:
 
 		if hasLanded(state):
-			print("\033[91mSuccess !\033[0m", file=sys.stderr, flush=True)
+			print("\033[92mSuccess !\033[0m", file=sys.stderr, flush=True)
 			break
 		if outOfBounds(state) or crossLand(state):
 			print("\033[91mFail !\033[0m", file=sys.stderr, flush=True)
@@ -226,6 +234,7 @@ def simule(data, program):
 				player.kill()
 				exit(1)
 
+		print(state, file=sys.stderr, flush=True)
 		game.append(state.dict())
 	
 	player.kill()

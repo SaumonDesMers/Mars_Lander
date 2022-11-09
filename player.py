@@ -85,6 +85,10 @@ def crossLand(state):
 def outOfBounds(state):
 	return state.x < 0 or state.x > 6999 or state.y < 0 or state.y > 2999
 
+def hasLanded(s):
+	global landingSurface
+	return s.y <= landingSurface["y"] and landingSurface["x1"] <= s.x <= landingSurface["x2"] and abs(s.hSpeed) <= 20 and abs(s.vSpeed) <= 40 and s.rotate == 90
+
 def getOutput(hs, vs):
 	power = int(math.sqrt(hs**2 + vs**2))
 	if vs < 0:
@@ -121,7 +125,7 @@ def landingPoint(s):
 		lp = (s.x, landingSurface["y"])
 	return lp
 
-def calculeNextOutput(s, debug=False):
+def computeOutput(s, debug=False):
 
 	ns_idle = s.next(s.rotate, s.power)
 
@@ -133,7 +137,7 @@ def calculeNextOutput(s, debug=False):
 
 	wish_vec = (dest_point[0] - ns_idle.x, dest_point[1] - ns_idle.y)
 	# wish_vec = (0, 10)
-	wish_vec = normalize(wish_vec, 100)
+	wish_vec = normalize(wish_vec, 20)
 	# print("vec voulu =", wish_vec, file=sys.stderr, flush=True)
 
 	corr_vec = (wish_vec[0] - act_vec[0], wish_vec[1] - act_vec[1])
@@ -142,7 +146,7 @@ def calculeNextOutput(s, debug=False):
 	output = getOutput(*corr_vec)
 	tOutput = truncOutput(*output)
 
-	if s.y < dest_point[1] + 500:
+	if s.y < dest_point[1] + 800:
 		tOutput = (90, 4)
 		
 	# tOutput = (0, 4)
@@ -160,16 +164,58 @@ def calculeNextOutput(s, debug=False):
 	
 	return tOutput
 
-def simule(s):
+def computeOutputLanding(s, debug=False):
+	power = 0
+	if s.vSpeed < -30:
+		power = 4
+	return (90, power)
+
+def oposingVector(s, debug=False):
+	ns_idle = s.next(s.rotate, s.power)
+
+	act_vec = (s.hSpeed, s.vSpeed)
+	# print("vec actuel =", act_vec, file=sys.stderr, flush=True)
+
+	# dest_point = (3000, 1500)
+	dest_point = landingPoint(s)
+
+	# wish_vec = (dest_point[0] - ns_idle.x, dest_point[1] - ns_idle.y)
+	wish_vec = (0, 3)
+	# wish_vec = normalize(wish_vec, 20)
+	# print("vec voulu =", wish_vec, file=sys.stderr, flush=True)
+
+	corr_vec = (wish_vec[0] - act_vec[0], wish_vec[1] - act_vec[1])
+	# print("vec correctionel =", corr_vec, file=sys.stderr, flush=True)
+
+	output = getOutput(*corr_vec)
+	tOutput = truncOutput(*output)
+	
+	return tOutput
+
+def simuleIdle(s, rotate, power):
 	global step
-	s = s.next(*calculeNextOutput(s))
-	while not outOfBounds(s) and not crossLand(s):
-		draw.line(s.x, s.y, s.x + s.hSpeed, s.y + s.vSpeed, 1, "#555555")
+	s = s.next(rotate, power)
+	while True:
+		if hasLanded(s):
+			return True
+		if outOfBounds(s) or crossLand(s):
+			return False
+		draw.line(s.x, s.y, s.x + s.hSpeed, s.y + s.vSpeed, 1, "#005555")
 		draw.point(s.x, s.y, 5, "#777777")
-		output = calculeNextOutput(s)
-		# if step == 0:
-		# 	print(s, "->", output, file=sys.stderr, flush=True)
-		
+		s = s.next(rotate, power)
+
+def simule(s, _computeOutput, debug=False, color="#555555"):
+	global step
+	s = s.next(*_computeOutput(s))
+	while True:
+		if hasLanded(s):
+			return True
+		if outOfBounds(s) or crossLand(s):
+			return False
+		if debug:
+			draw.line(s.x, s.y, s.x + s.hSpeed, s.y + s.vSpeed, 1, color)
+			draw.point(s.x, s.y, 5, color)
+		output = _computeOutput(s)
 		s = s.next(*output)
 
 draw = Draw()
@@ -181,7 +227,7 @@ for i in range(surface_n):
 	land_x, land_y = [int(j) for j in input().split()]
 	land.append((land_x, land_y))
 
-# get landing point
+# get landing surface
 landingSurface = (0, 0, 0)
 for i in range(surface_n - 1):
 	if land[i][1] == land[i+1][1]:
@@ -191,16 +237,24 @@ for i in range(surface_n - 1):
 			"y": land[i][1]
 		}
 
+funcComputeOutput = computeOutput
+
 step = 0
 while True:
 	x, y, h_speed, v_speed, fuel, rotate, power = [int(i) for i in input().split()]
 	state = State(x, y, h_speed, v_speed, fuel, rotate, power)
 
-	output = calculeNextOutput(state, debug=True)
+	output = funcComputeOutput(state, debug=True)
 	print(output[0] - 90, output[1], flush=True)
 	print("step", step, ":", output, flush=True, file=sys.stderr)
 
-	simule(state)
+	simule(state, computeOutput, debug=True)
+	if simule(state, computeOutputLanding, debug=True, color="#007070"):
+		print("Switch to landing mode", flush=True, file=sys.stderr)
+		funcComputeOutput = computeOutputLanding
+	if simule(state, oposingVector, debug=True, color="#700070"):
+		print("Switch to oposing vector mode", flush=True, file=sys.stderr)
+		funcComputeOutput = oposingVector
 
 	draw.flush()
 	step += 1

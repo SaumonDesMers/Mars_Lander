@@ -92,12 +92,27 @@ def crossLand(state):
 def outOfBounds(state):
 	return state.x < 0 or state.x > 6999 or state.y < 0 or state.y > 2999
 
+def hasLanded(s):
+	global landingSurface
+	return s.y <= landingSurface["y"] and landingSurface["x1"] <= s.x <= landingSurface["x2"] and abs(s.hSpeed) <= 20 and abs(s.vSpeed) <= 40 and s.rotate == 90
+
 def simule(data, program):
 	global land
 	land = data["land"]
 	data["start"]["rotate"] += 90
 	state = State(**data["start"])
 	game = [state.dict()]
+
+	# get landing surface
+	global landingSurface
+	landingSurface = (0, 0, 0)
+	for i in range(len(land) - 1):
+		if land[i]["y"] == land[i+1]["y"]:
+			landingSurface = {
+				"x1": land[i]["x"], 
+				"x2": land[i+1]["x"],
+				"y": land[i]["y"]
+			}
 
 	# execute the program in a subprocess
 	global player
@@ -118,7 +133,15 @@ def simule(data, program):
 		# print("Game sending surface point {}...".format(i), file=sys.stderr, flush=True)
 		player.stdin.write("{} {}\n".format(land[i]["x"], land[i]["y"]).encode())
 
-	while not crossLand(state) and not outOfBounds(state):
+	# while not crossLand(state) and not outOfBounds(state):
+	while True:
+
+		if hasLanded(state):
+			print("\033[91mSuccess !\033[0m", file=sys.stderr, flush=True)
+			break
+		if outOfBounds(state) or crossLand(state):
+			print("\033[91mFail !\033[0m", file=sys.stderr, flush=True)
+			break
 
 		# send the state to the program
 		# print("Game sending state...", file=sys.stderr, flush=True)
@@ -143,10 +166,6 @@ def simule(data, program):
 			error("invalid power value")
 			player.kill()
 			exit(1)
-
-		# update power if not enough fuel
-		# if state.fuel < power:
-		# 	power = max(state.fuel, 0)
 
 		state = state.next(rotate + 90, power)
 

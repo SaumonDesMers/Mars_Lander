@@ -53,10 +53,12 @@ class State:
 		nextRotate = self.rotate + min(15, max(-15, inputRotate - self.rotate))
 		nextPower = self.power + (1 if inputPower > self.power else -1 if inputPower < self.power else 0)
 		nextPower = min(nextPower, self.fuel)
-		nextHSpeed = self.hSpeed + math.cos(math.radians(nextRotate)) * nextPower
-		nextVSpeed = self.vSpeed + math.sin(math.radians(nextRotate)) * nextPower - 3.711
-		nextX = self.x + nextHSpeed
-		nextY = self.y + nextVSpeed
+		xAcc = math.cos(math.radians(nextRotate)) * nextPower
+		yAcc = math.sin(math.radians(nextRotate)) * nextPower - 3.711
+		nextHSpeed = self.hSpeed + xAcc
+		nextVSpeed = self.vSpeed + yAcc
+		nextX = self.x + self.hSpeed + xAcc / 2
+		nextY = self.y + self.vSpeed + yAcc / 2
 		nextFuel = self.fuel - nextPower
 		return State(nextX, nextY, nextHSpeed, nextVSpeed, nextFuel, nextRotate, nextPower)
 	
@@ -153,7 +155,15 @@ def simule(data, program):
 
 		# send the state to the program
 		# print("Game sending state...", file=sys.stderr, flush=True)
-		player.stdin.write("{} {} {} {} {} {} {}\n".format(int(state.x), int(state.y), int(state.hSpeed), int(state.vSpeed), int(state.fuel), int(state.rotate), int(state.power)).encode())
+		player.stdin.write("{} {} {} {} {} {} {}\n".format(
+			round(state.x),
+			round(state.y),
+			round(state.hSpeed),
+			round(state.vSpeed),
+			round(state.fuel),
+			round(state.rotate - 90),
+			round(state.power)
+		).encode())
 		player.stdin.flush()
 
 		# read input from stdin
@@ -234,7 +244,7 @@ def simule(data, program):
 				player.kill()
 				exit(1)
 
-		print(state, file=sys.stderr, flush=True)
+		# print("game  ", state, file=sys.stderr, flush=True)
 		game.append(state.dict())
 	
 	player.kill()

@@ -1,5 +1,5 @@
 from tkinter import *
-from PIL import Image, ImageTk, ImageDraw, ImageFont
+from PIL import Image, ImageTk, ImageDraw
 import json
 import sys
 from simule import simule

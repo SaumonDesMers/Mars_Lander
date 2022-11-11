@@ -39,13 +39,15 @@ class State:
 		nextRotate = self.rotate + min(15, max(-15, inputRotate - self.rotate))
 		nextPower = self.power + (1 if inputPower > self.power else -1 if inputPower < self.power else 0)
 		nextPower = min(nextPower, self.fuel)
-		nextHSpeed = self.hSpeed + math.cos(math.radians(nextRotate)) * nextPower
-		nextVSpeed = self.vSpeed + math.sin(math.radians(nextRotate)) * nextPower - 3.711
-		nextX = self.x + nextHSpeed
-		nextY = self.y + nextVSpeed
+		xAcc = math.cos(math.radians(nextRotate)) * nextPower
+		yAcc = math.sin(math.radians(nextRotate)) * nextPower - 3.711
+		nextHSpeed = self.hSpeed + xAcc
+		nextVSpeed = self.vSpeed + yAcc
+		nextX = self.x + self.hSpeed + xAcc / 2
+		nextY = self.y + self.vSpeed + yAcc / 2
 		nextFuel = self.fuel - nextPower
 		return State(nextX, nextY, nextHSpeed, nextVSpeed, nextFuel, nextRotate, nextPower)
-
+	
 	def nexts(self, inputList):
 		stateList = []
 		for input in inputList:
@@ -134,8 +136,6 @@ def landingPoint(s):
 	return lp
 
 def computeOutput(s, debug=False):
-	ns_idle = s.next(s.rotate, s.power)
-
 	act_vec = (s.hSpeed, s.vSpeed)
 
 	# dest_point = (3000, 1500)
@@ -169,7 +169,6 @@ def computeOutput(s, debug=False):
 		_y = ns.y + math.sin(math.radians(output[0])) * output[1]
 		draw.line(ns.x, ns.y, _x, _y, 2, "#00ffff")
 	
-	# return (0, 0)
 	return tOutput
 
 def computeOutputLanding(s, debug=False):
@@ -222,8 +221,6 @@ def simule(s, _computeOutput, debug=False, color="#555555"):
 			draw.line(s.x, s.y, s.x + s.hSpeed, s.y + s.vSpeed, 1, color)
 			draw.point(s.x, s.y, 5, color)
 		output = _computeOutput(s)
-		# if debug and step == 0:
-		# 	print(s, file=sys.stderr, flush=True)
 		s = s.next(*output)
 
 draw = Draw()
@@ -245,19 +242,17 @@ for i in range(surface_n - 1):
 			"y": land[i][1]
 		}
 
+print(land, file=sys.stderr, flush=True)
+
 funcComputeOutput = computeOutput
 simuleValid = False
 
-step = 0
+step = 1
 while True:
 	x, y, h_speed, v_speed, fuel, rotate, power = [int(i) for i in input().split()]
-	state = State(x, y, h_speed, v_speed, fuel, rotate, power)
-	# print(state, file=sys.stderr, flush=True)
-
-	output = funcComputeOutput(state, debug=True)
-	print(output[0] - 90, output[1], flush=True)
-	# print(0, 0)
-	print("step", step, ":", output, flush=True, file=sys.stderr)
+	state = State(x, y, h_speed, v_speed, fuel, rotate + 90, power)
+	print("Step", step, file=sys.stderr, flush=True)
+	print(state, file=sys.stderr, flush=True)
 
 	simule(state, computeOutput, debug=True)
 	if simule(state, computeOutputLanding, debug=True, color="#007070") and not simuleValid:
@@ -268,6 +263,11 @@ while True:
 		print("Switch to oposing vector mode", flush=True, file=sys.stderr)
 		funcComputeOutput = oposingVector
 		simuleValid = True
+
+	output = funcComputeOutput(state, debug=True)
+	print(output[0] - 90, output[1], flush=True)
+	# print(0, 0)
+	print(output, flush=True, file=sys.stderr)
 
 	draw.flush()
 	step += 1

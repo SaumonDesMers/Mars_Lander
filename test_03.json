@@ -12,7 +12,7 @@
 	"start": {
 		"x": 6500,
 		"y": 2800,
-		"hSpeed": -100,
+		"hSpeed": -90,
 		"vSpeed": 0,
 		"fuel": 600,
 		"rotate": 90,

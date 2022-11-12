@@ -81,36 +81,59 @@ class State:
 			round(self.hSpeed),
 			round(self.vSpeed),
 			round(self.fuel),
-			round(self.rotate),
+			round(self.rotate - 90),
 			round(self.power)
 		)
 
 def round(n):
 	return int(n + (0.5 if n > 0 else -0.5))
 
-def crossLand(state):
+def crossLand(state, prevState):
 	global land
+	if prevState is None:
+		return None
 	for i in range(len(land) - 1):
-		if land[i]["x"] <= state.x <= land[i + 1]["x"]:
-			# find the equation of the line
-			# y = ax + b
-			a = (land[i + 1]["y"] - land[i]["y"]) / (land[i + 1]["x"] - land[i]["x"])
-			b = land[i]["y"] - a * land[i]["x"]
-			return state.y <= a * state.x + b
-	return False
+		# find the equation of the line
+		# y = ax + b
+		a = (land[i + 1]["y"] - land[i]["y"]) / (land[i + 1]["x"] - land[i]["x"])
+		b = land[i]["y"] - a * land[i]["x"]
+		# find the equation of the state line
+		# y = cx + d
+		c = 0 if state.x == prevState.x else (state.y - prevState.y) / (state.x - prevState.x)
+		d = state.y - c * state.x
+		# find the intersection point
+		if a == c:
+			continue
+		x = (d - b) / (a - c)
+		y = a * x + b
+		if ((prevState.y <= y <= state.y or prevState.y >= y >= state.y)
+			and (prevState.x <= x <= state.x or prevState.x >= x >= state.x)
+			and (land[i]["x"] <= x <= land[i + 1]["x"] or land[i]["x"] >= x >= land[i + 1]["x"])
+			and (land[i]["y"] <= y <= land[i + 1]["y"] or land[i]["y"] >= y >= land[i + 1]["y"])):
+			return (x, y)
+	return None
 
 def outOfBounds(state):
 	return state.x < 0 or state.x > 6999 or state.y < 0 or state.y > 2999
 
-def hasLanded(s):
+def hasLanded(s, intersection):
 	global landingSurface
-	return s.y <= landingSurface["y"] and landingSurface["x1"] <= s.x <= landingSurface["x2"] and abs(int(s.hSpeed)) <= 20 and abs(int(s.vSpeed)) <= 40 and s.rotate == 90
+	if intersection is None:
+		return False
+	return (
+		intersection[1] <= landingSurface["y"]
+		and landingSurface["x1"] <= intersection[0] <= landingSurface["x2"]
+		and abs(int(s.hSpeed)) <= 20
+		and abs(int(s.vSpeed)) <= 40
+		and s.rotate == 90
+	)
 
 def simule(data, program):
 	global land
 	land = data["land"]
 	data["start"]["rotate"] += 90
 	state = State(**data["start"])
+	prevState = None
 	game = [state.dict()]
 
 	# get landing surface
@@ -143,13 +166,13 @@ def simule(data, program):
 		# print("Game sending surface point {}...".format(i), file=sys.stderr, flush=True)
 		player.stdin.write("{} {}\n".format(land[i]["x"], land[i]["y"]).encode())
 
-	# while not crossLand(state) and not outOfBounds(state):
 	while True:
 
-		if hasLanded(state):
+		intersection = crossLand(state, prevState)
+		if hasLanded(state, intersection):
 			print("\033[92mSuccess !\033[0m", file=sys.stderr, flush=True)
 			break
-		if outOfBounds(state) or crossLand(state):
+		if outOfBounds(state) or intersection is not None:
 			print("\033[91mFail !\033[0m", file=sys.stderr, flush=True)
 			break
 
@@ -185,6 +208,7 @@ def simule(data, program):
 			player.kill()
 			exit(1)
 
+		prevState = state
 		state = state.next(rotate + 90, power)
 
 		# read the draw command

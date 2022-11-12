@@ -55,6 +55,17 @@ class State:
 			stateList.append(state)
 		return stateList
 
+	def checkValue(self, x, y, hSpeed, vSpeed, fuel, rotate, power):
+		return (
+			round(self.x) == x
+			and round(self.y) == y
+			and round(self.hSpeed) == hSpeed
+			and round(self.vSpeed) == vSpeed
+			and round(self.fuel) == fuel
+			and round(self.rotate) == rotate
+			and round(self.power) == power
+		)
+
 	def dict(self):
 		return {
 			"x": int(self.x),
@@ -74,30 +85,50 @@ class State:
 			round(self.hSpeed),
 			round(self.vSpeed),
 			round(self.fuel),
-			round(self.rotate),
+			round(self.rotate - 90),
 			round(self.power)
 		)
 
 def round(n):
 	return int(n + (0.5 if n > 0 else -0.5))
 
-def crossLand(state):
+def crossLand(state, prevState):
 	global land
+	if prevState is None:
+		return None
 	for i in range(len(land) - 1):
-		if land[i][0] <= state.x <= land[i + 1][0]:
-			# find the equation of the line
-			# y = ax + b
-			a = (land[i + 1][1] - land[i][1]) / (land[i + 1][0] - land[i][0])
-			b = land[i][1] - a * land[i][0]
-			return state.y <= a * state.x + b
-	return False
+		# find the equation of the line
+		# y = ax + b
+		a = (land[i + 1][1] - land[i][1]) / (land[i + 1][0] - land[i][0])
+		b = land[i][1] - a * land[i][0]
+		# find the equation of the state line
+		# y = cx + d
+		c = 0 if state.x == prevState.x else (state.y - prevState.y) / (state.x - prevState.x)
+		d = state.y - c * state.x
+		# find the intersection point
+		if a == c:
+			continue
+		x = (d - b) / (a - c)
+		y = a * x + b
+		if ((prevState.y <= y <= state.y or prevState.y >= y >= state.y)
+			and (prevState.x <= x <= state.x or prevState.x >= x >= state.x)
+			and (land[i][0] <= x <= land[i + 1][0] or land[i][0] >= x >= land[i + 1][0])
+			and (land[i][1] <= y <= land[i + 1][1] or land[i][1] >= y >= land[i + 1][1])):
+			return (x, y)
+	return None
 
 def outOfBounds(state):
 	return state.x < 0 or state.x > 6999 or state.y < 0 or state.y > 2999
 
-def hasLanded(s):
+def hasLanded(s, offset=0):
 	global landingSurface
-	return s.y <= landingSurface["y"] and landingSurface["x1"] <= s.x <= landingSurface["x2"] and abs(s.hSpeed) <= 20 and abs(s.vSpeed) <= 40 and s.rotate == 90
+	return (
+		s.y <= landingSurface["y"]
+		and landingSurface["x1"] + offset <= s.x <= landingSurface["x2"] - offset
+		and abs(s.hSpeed) <= 20
+		and abs(s.vSpeed) <= 40
+		and s.rotate == 90
+	)
 
 def getOutput(hs, vs):
 	power = int(math.sqrt(hs**2 + vs**2))
@@ -136,30 +167,29 @@ def landingPoint(s):
 	return lp
 
 def computeOutput(s, debug=False):
+
+	ns_idle = s.next(s.rotate, state.power)
+
 	act_vec = (s.hSpeed, s.vSpeed)
 
-	# dest_point = (3000, 1500)
 	dest_point = landingPoint(s)
-	# dest_point = (dest_point[0], dest_point[1] + 1000)
+	if landingSurface["x1"] > s.x or s.x > landingSurface["x2"]:
+		dest_point = (dest_point[0], 3000)
 
-	# wish_vec = (dest_point[0] - ns_idle.x, dest_point[1] - ns_idle.y)
-	wish_vec = (0, 4)
-	if s.x < dest_point[0]:
-		wish_vec = (4, 4)
-	elif s.x > dest_point[0]:
-		wish_vec = (-4, 4)
-	wish_vec = normalize(wish_vec, 20)
+	wish_vec = (dest_point[0] - ns_idle.x, dest_point[1] - ns_idle.y)
+	wish_vec = normalize(wish_vec, max(norme(act_vec), 20))
 
 	corr_vec = (wish_vec[0] - act_vec[0], wish_vec[1] - act_vec[1])
 
 	output = getOutput(*corr_vec)
 	tOutput = truncOutput(*output)
-
-	# if s.y < dest_point[1] + 800:
-	# 	tOutput = (90, 4)
 		
 	ns = s.next(*tOutput)
 	if debug:
+		size = 5
+		act_vec = (act_vec[0] * size, act_vec[1] * size)
+		wish_vec = (wish_vec[0] * size, wish_vec[1] * size)
+		corr_vec = (corr_vec[0] * size, corr_vec[1] * size)
 		draw.line(ns.x, ns.y, ns.x + act_vec[0], ns.y + act_vec[1], 2, "#00ff00")
 		draw.line(ns.x, ns.y, ns.x + wish_vec[0], ns.y + wish_vec[1], 2, "#0000ff")
 		draw.line(ns.x, ns.y, ns.x + corr_vec[0], ns.y + corr_vec[1], 2, "#ff0000")
@@ -171,7 +201,7 @@ def computeOutput(s, debug=False):
 	
 	return tOutput
 
-def computeOutputLanding(s, debug=False):
+def computeLanding(s, debug=False):
 	power = 0
 	if s.vSpeed < -30:
 		power = 4
@@ -179,22 +209,19 @@ def computeOutputLanding(s, debug=False):
 
 def oposingVector(s, debug=False):
 	act_vec = (s.hSpeed, s.vSpeed)
-	# print("vec actuel =", act_vec, file=sys.stderr, flush=True)
 
 	# dest_point = (3000, 1500)
 	dest_point = landingPoint(s)
 
 	# wish_vec = (dest_point[0] - ns_idle.x, dest_point[1] - ns_idle.y)
-	wish_vec = (0, 3)
+	wish_vec = (0, 3) # maybe 4
 	# wish_vec = normalize(wish_vec, 20)
-	# print("vec voulu =", wish_vec, file=sys.stderr, flush=True)
 
 	corr_vec = (wish_vec[0] - act_vec[0], wish_vec[1] - act_vec[1])
-	# print("vec correctionel =", corr_vec, file=sys.stderr, flush=True)
 
 	output = getOutput(*corr_vec)
 	tOutput = truncOutput(*output)
-	
+
 	return tOutput
 
 def simuleIdle(s, rotate, power):
@@ -209,19 +236,30 @@ def simuleIdle(s, rotate, power):
 		draw.point(s.x, s.y, 5, "#777777")
 		s = s.next(rotate, power)
 
-def simule(s, _computeOutput, debug=False, color="#555555"):
+def simule(s, _computeOutput, simuleLanding, debug=False, color="#555555"):
 	global step
-	s = s.next(*_computeOutput(s))
+	output = _computeOutput(s)
+	s = s.next(*output)
+	ps = None
 	while True:
-		if hasLanded(s):
+
+		if hasLanded(s, 100):
 			return True
-		if outOfBounds(s) or crossLand(s):
+		if outOfBounds(s) or crossLand(s, ps):
 			return False
+		
 		if debug:
 			draw.line(s.x, s.y, s.x + s.hSpeed, s.y + s.vSpeed, 1, color)
 			draw.point(s.x, s.y, 5, color)
-		output = _computeOutput(s)
+
+		if simuleLanding and abs(s.hSpeed) <= 20 and simule(s, computeLanding, simuleLanding=False, debug=not simuleValide, color="#606000"):
+			output = computeLanding(s)
+		else:
+			output = _computeOutput(s)
+
+		ps = s
 		s = s.next(*output)
+
 
 draw = Draw()
 
@@ -242,32 +280,42 @@ for i in range(surface_n - 1):
 			"y": land[i][1]
 		}
 
-print(land, file=sys.stderr, flush=True)
-
 funcComputeOutput = computeOutput
-simuleValid = False
+simuleValide = False
+state = State(*[0]*7)
 
 step = 1
 while True:
 	x, y, h_speed, v_speed, fuel, rotate, power = [int(i) for i in input().split()]
-	state = State(x, y, h_speed, v_speed, fuel, rotate + 90, power)
+
+	# check if the compute state match the input state
+	if not state.checkValue(x, y, h_speed, v_speed, fuel, rotate + 90, power):
+		print("Change state to match input", file=sys.stderr, flush=True)
+		state = State(x, y, h_speed, v_speed, fuel, rotate + 90, power)
+
+
 	print("Step", step, file=sys.stderr, flush=True)
 	print(state, file=sys.stderr, flush=True)
 
-	simule(state, computeOutput, debug=True)
-	if simule(state, computeOutputLanding, debug=True, color="#007070") and not simuleValid:
+	if not simuleValide and simule(state, computeOutput, simuleLanding=True, debug=True, color="#700000"):
+		print("Base mode valide", flush=True, file=sys.stderr)
+		simuleValide = True
+	if simule(state, computeLanding, simuleLanding=False, debug=True, color="#007070"):
 		print("Switch to landing mode", flush=True, file=sys.stderr)
-		funcComputeOutput = computeOutputLanding
-		simuleValid = True
-	if simule(state, oposingVector, debug=True, color="#700070") and not simuleValid:
+		funcComputeOutput = computeLanding
+		simuleValide = True
+	if not simuleValide and simule(state, oposingVector, simuleLanding=True, debug=True, color="#700070"):
 		print("Switch to oposing vector mode", flush=True, file=sys.stderr)
 		funcComputeOutput = oposingVector
-		simuleValid = True
-
+		simuleValide = True
+	
+	simule(state, funcComputeOutput, simuleLanding=False, debug=True)
 	output = funcComputeOutput(state, debug=True)
+
 	print(output[0] - 90, output[1], flush=True)
 	# print(0, 0)
 	print(output, flush=True, file=sys.stderr)
 
+	state = state.next(*output)
 	draw.flush()
 	step += 1

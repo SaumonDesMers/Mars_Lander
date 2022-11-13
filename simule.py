@@ -149,12 +149,16 @@ def simule(data, program):
 
 	# execute the program in a subprocess
 	global player
-	player = subprocess.Popen(
-		["python3", program],
-		stdout=subprocess.PIPE,
-		stderr=sys.stderr,
-		stdin=subprocess.PIPE
-	)
+	try:
+		player = subprocess.Popen(
+			program.split(),
+			stdout=subprocess.PIPE,
+			stderr=sys.stderr,
+			stdin=subprocess.PIPE
+		)
+	except Exception as e:
+		error("Error while executing your program: {}".format(e))
+		sys.exit(1)
 
 	# create a non-blocking reader for the subprocess
 	io = NonBlockingStreamReader(player.stdout)
@@ -170,10 +174,10 @@ def simule(data, program):
 
 		intersection = crossLand(state, prevState)
 		if hasLanded(state, intersection):
-			print("\033[92mSuccess !\033[0m", file=sys.stderr, flush=True)
+			print("\033[92mYou landed successfully!\033[0m", file=sys.stderr, flush=True)
 			break
 		if outOfBounds(state) or intersection is not None:
-			print("\033[91mFail !\033[0m", file=sys.stderr, flush=True)
+			print("\033[91mYou crashed !\033[0m", file=sys.stderr, flush=True)
 			break
 
 		# send the state to the program

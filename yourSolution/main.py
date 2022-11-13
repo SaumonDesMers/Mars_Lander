@@ -28,8 +28,8 @@ while True:
 	# Write the number of drawing commands that will follow
 	print("0")
 
-	# All the numbers must be integers
-	# The color must respect the format '#RRGGBB' (not case sensitive)
+	# All the numbers must be integers.
+	# The color must respect the format '#RRGGBB' (not case sensitive).
 
 	# Draw a line from point A to point B with a width of W and a color of C.
 	# print("LINE Ax Ay Bx By W C")

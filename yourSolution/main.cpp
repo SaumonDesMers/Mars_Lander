@@ -41,8 +41,8 @@ int main()
 		// Write the number of drawing commands that will follow
 		cout << "0" << endl;
 
-		// All the numbers must be integers
-		// The color must respect the format '#RRGGBB' (not case sensitive)
+		// All the numbers must be integers.
+		// The color must respect the format '#RRGGBB' (not case sensitive).
 
 		// Draw a line from point A to point B with a width of W and a color of C.
 		// cout << "LINE Ax Ay Bx By W C" << endl;

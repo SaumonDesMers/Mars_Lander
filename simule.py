@@ -4,7 +4,6 @@ import re
 import sys
 import time
 import subprocess
-import select
 import threading
 import queue
 

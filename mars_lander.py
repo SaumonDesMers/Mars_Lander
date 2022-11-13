@@ -149,17 +149,6 @@ def execDrawCmd(draw, cmds):
 				fill=cmd["color"],
 				width=cmd["width"]
 			)
-		elif cmd["type"] == "ellipse":
-			draw.ellipse(
-				(
-					cmd["x1"] * ration,
-					(playground_height - cmd["y1"]) * ration,
-					cmd["x2"] * ration,
-					(playground_height - cmd["y2"]) * ration
-				),
-				outline=cmd["color"],
-				width=cmd["width"]
-			)
 		elif cmd["type"] == "circle":
 			draw.ellipse(
 				(

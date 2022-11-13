@@ -233,17 +233,6 @@ def simule(data, program):
 					"width": int(args[5]),
 					"color": args[6]
 				})
-			elif re.match(r"ELLIPSE [\d-]+ [\d-]+ [\d-]+ [\d-]+ \d+ #[\da-fA-F]{6}$", str):
-				args = str.split(" ")
-				state.drawCmd.append({
-					"type": "ellipse",
-					"x": int(args[1]),
-					"y": int(args[2]),
-					"width": int(args[3]),
-					"height": int(args[4]),
-					"width": int(args[5]),
-					"color": args[6]
-				})
 			elif re.match(r"CIRCLE [\d-]+ [\d-]+ \d+ \d+ #[\da-fA-F]{6}$", str):
 				args = str.split(" ")
 				state.drawCmd.append({

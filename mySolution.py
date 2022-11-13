@@ -9,9 +9,6 @@ class Draw:
 	def line(self, x1, y1, x2, y2, width, color):
 		self.cmd.append("LINE {} {} {} {} {} {}".format(int(x1), int(y1), int(x2), int(y2), int(width), color))
 
-	def ellipse(self, x, y, width, height, color):
-		self.cmd.append("ELLIPSE {} {} {} {} {}".format(int(x), int(y), int(width), int(height), color))
-	
 	def circle(self, x, y, radius, color):
 		self.cmd.append("CIRCLE {} {} {} {}".format(int(x), int(y), int(radius), color))
 	
@@ -295,12 +292,12 @@ while True:
 
 
 	print("Step", step, file=sys.stderr, flush=True)
-	print(state, file=sys.stderr, flush=True)
+	print("  ", state, file=sys.stderr, flush=True)
 
 	if not simuleValide and simule(state, computeOutput, simuleLanding=True, debug=True, color="#700000"):
 		print("Base mode valide", flush=True, file=sys.stderr)
 		simuleValide = True
-	if simule(state, computeLanding, simuleLanding=False, debug=True, color="#007070"):
+	if funcComputeOutput != computeLanding and simule(state, computeLanding, simuleLanding=False, debug=True, color="#007070"):
 		print("Switch to landing mode", flush=True, file=sys.stderr)
 		funcComputeOutput = computeLanding
 		simuleValide = True
@@ -313,8 +310,7 @@ while True:
 	output = funcComputeOutput(state, debug=True)
 
 	print(output[0] - 90, output[1], flush=True)
-	# print(0, 0)
-	print(output, flush=True, file=sys.stderr)
+	print("  ", output, flush=True, file=sys.stderr)
 
 	state = state.next(*output)
 	draw.flush()

@@ -40,9 +40,6 @@ def inputCheck():
 		if not (0 <= land["x"] <= playground_width and 0 <= land["y"] <= playground_height):
 			error("land point {} out of bounds: {}".format(i, land))
 			exit(1)
-		if i > 0 and land["x"] <= data["land"][i - 1]["x"]:
-			error("land x not increasing: {} <= {}".format(land["x"], data["land"][i - 1]["x"]))
-			exit(1)
 	if data["land"][0]["x"] != 0:
 		error("first land x not 0: {}".format(data["land"][0]["x"]))
 		exit(1)

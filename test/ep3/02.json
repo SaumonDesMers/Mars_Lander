@@ -22,11 +22,11 @@
 	],
 	"start": {
 		"x": 6500,
-		"y": 2600,
-		"hSpeed": -20,
+		"y": 2000,
+		"hSpeed": 0,
 		"vSpeed": 0,
-		"fuel": 1000,
-		"rotate": 45,
+		"fuel": 1200,
+		"rotate": 0,
 		"power": 0
 	}
 }

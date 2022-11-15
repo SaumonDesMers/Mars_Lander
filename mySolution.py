@@ -1,6 +1,6 @@
 import sys
 import math
-import os
+import time
 
 class Draw:
 	def __init__(self):
@@ -9,8 +9,8 @@ class Draw:
 	def line(self, x1, y1, x2, y2, width, color):
 		self.cmd.append("LINE {} {} {} {} {} {}".format(int(x1), int(y1), int(x2), int(y2), int(width), color))
 
-	def circle(self, x, y, radius, color):
-		self.cmd.append("CIRCLE {} {} {} {}".format(int(x), int(y), int(radius), color))
+	def circle(self, x, y, radius, width, color):
+		self.cmd.append("CIRCLE {} {} {} {} {}".format(int(x), int(y), int(radius), int(width), color))
 	
 	def point(self, x, y, width, color):
 		self.cmd.append("POINT {} {} {} {}".format(int(x), int(y), int(width), color))
@@ -20,6 +20,13 @@ class Draw:
 		for d in self.cmd:
 			print(d)
 		self.cmd = []
+
+class Point:
+	def __init__(self, x, y):
+		self.x = x
+		self.y = y
+	def __str__(self):
+		return "(%d, %d)" % (self.x, self.y)
 
 class State:
 	def __init__(self, x, y, hSpeed, vSpeed, fuel, rotate, power):
@@ -93,25 +100,29 @@ def crossLand(state, prevState):
 	global land
 	if prevState is None:
 		return None
+
+	# find the equation of the state line
+	# ax + by + c = 0
+	a2 = state.y - prevState.y
+	b2 = prevState.x - state.x
+	c2 = state.x * prevState.y - prevState.x * state.y
+
 	for i in range(len(land) - 1):
-		# find the equation of the line
-		# y = ax + b
-		a = (land[i + 1][1] - land[i][1]) / (land[i + 1][0] - land[i][0])
-		b = land[i][1] - a * land[i][0]
-		# find the equation of the state line
-		# y = cx + d
-		c = 0 if state.x == prevState.x else (state.y - prevState.y) / (state.x - prevState.x)
-		d = state.y - c * state.x
-		# find the intersection point
-		if a == c:
+
+		# find the intersection point between the state line and the land line
+		det = land[i]["a"] * b2 - a2 * land[i]["b"]
+		if det == 0:
 			continue
-		x = (d - b) / (a - c)
-		y = a * x + b
+		x = (land[i]["b"] * c2 - b2 * land[i]["c"]) / det
+		y = (a2 * land[i]["c"] - land[i]["a"] * c2) / det
+
+		# check if the intersection point is on the land segment and the state segment
 		if ((prevState.y <= y <= state.y or prevState.y >= y >= state.y)
 			and (prevState.x <= x <= state.x or prevState.x >= x >= state.x)
-			and (land[i][0] <= x <= land[i + 1][0] or land[i][0] >= x >= land[i + 1][0])
-			and (land[i][1] <= y <= land[i + 1][1] or land[i][1] >= y >= land[i + 1][1])):
+			and (land[i]["x"] <= x <= land[i + 1]["x"] or land[i]["x"] >= x >= land[i + 1]["x"])
+			and (land[i]["y"] <= y <= land[i + 1]["y"] or land[i]["y"] >= y >= land[i + 1]["y"])):
 			return (x, y)
+	
 	return None
 
 def outOfBounds(state):
@@ -151,27 +162,31 @@ def normalize(vec, scale=1):
 		return vec
 	return (vec[0] / n * scale, vec[1] / n * scale)
 
-def landingPoint(s):
+def landingPoint(x):
 	global landingSurface
 	offset = 100
 	lp = (0, 0)
-	if s.x < landingSurface["x1"] + offset:
+	if x < landingSurface["x1"] + offset:
 		lp = (landingSurface["x1"] + offset, landingSurface["y"])
-	elif s.x > landingSurface["x2"] - offset:
+	elif x > landingSurface["x2"] - offset:
 		lp = (landingSurface["x2"] - offset, landingSurface["y"])
 	else:
-		lp = (s.x, landingSurface["y"])
+		lp = (x, landingSurface["y"])
 	return lp
 
 def computeOutput(s, debug=False):
+	global hasReachedMidDest, midDest, simuleValide
 
 	ns_idle = s.next(s.rotate, state.power)
 
 	act_vec = (s.hSpeed, s.vSpeed)
 
-	dest_point = landingPoint(s)
-	if landingSurface["x1"] > s.x or s.x > landingSurface["x2"]:
-		dest_point = (dest_point[0], 3000)
+	dest_point = (midDest.x, midDest.y)
+	# if hasReachedMidDest:# and not simuleValide:
+	# 	dest_point = landingPoint(s.x)
+	# 	if landingSurface["x1"] > s.x or s.x > landingSurface["x2"]:
+	# 		dest_point = (dest_point[0], 3000)
+	
 
 	wish_vec = (dest_point[0] - ns_idle.x, dest_point[1] - ns_idle.y)
 	wish_vec = normalize(wish_vec, max(norme(act_vec), 20))
@@ -207,12 +222,7 @@ def computeLanding(s, debug=False):
 def oposingVector(s, debug=False):
 	act_vec = (s.hSpeed, s.vSpeed)
 
-	# dest_point = (3000, 1500)
-	dest_point = landingPoint(s)
-
-	# wish_vec = (dest_point[0] - ns_idle.x, dest_point[1] - ns_idle.y)
 	wish_vec = (0, 3) # maybe 4
-	# wish_vec = normalize(wish_vec, 20)
 
 	corr_vec = (wish_vec[0] - act_vec[0], wish_vec[1] - act_vec[1])
 
@@ -233,30 +243,85 @@ def simuleIdle(s, rotate, power):
 		draw.point(s.x, s.y, 5, "#777777")
 		s = s.next(rotate, power)
 
-def simule(s, _computeOutput, simuleLanding, debug=False, color="#555555"):
-	global step
-	output = _computeOutput(s)
+def simuleLanding(s, debug=False):
+	global step, landingSurface, midDest
+
+	lp = landingPoint(s.x)# or abs(s.x - lp.x) < abs(s.x + s.hSpeed - lp.x):
+	lp = Point(lp[0], lp[1] + 1)
+
+	if (
+		abs(s.hSpeed) > 20
+		or crossLand(s, lp)
+		or dist(s, midDest) < 10
+		or abs(s.x - lp.x) < abs(s.x + s.hSpeed - lp.x)
+		):
+		return False
+
+	output = computeLanding(s)
 	s = s.next(*output)
 	ps = None
 	while True:
 
 		if hasLanded(s, 100):
 			return True
-		if outOfBounds(s) or crossLand(s, ps):
+		if outOfBounds(s) or crossLand(s, ps) or s.y < landingSurface["y"]:
+			return False
+		
+		if debug:
+			draw.line(s.x, s.y, s.x + s.hSpeed, s.y + s.vSpeed, 1, "#505000")
+			draw.point(s.x, s.y, 5, "#606000")
+
+		output = computeLanding(s)
+
+		ps = s
+		s = s.next(*output)
+
+def simule(s, _computeOutput, simuleLandingB, debug=False, color="#555555"):
+	global midDest
+	output = _computeOutput(s)
+	s = s.next(*output)
+	ps = None
+	i = 0
+	while True:
+
+		if hasLanded(s, 10):
+			return True
+		if outOfBounds(s) or crossLand(s, ps) or dist(s, midDest) < 10:
 			return False
 		
 		if debug:
 			draw.line(s.x, s.y, s.x + s.hSpeed, s.y + s.vSpeed, 1, color)
 			draw.point(s.x, s.y, 5, color)
 
-		if simuleLanding and abs(s.hSpeed) <= 20 and simule(s, computeLanding, simuleLanding=False, debug=not simuleValide, color="#606000"):
-			output = computeLanding(s)
-		else:
-			output = _computeOutput(s)
+		if simuleLandingB and i%3 == 0 and simuleLanding(s, debug=True):
+			return True
+		output = _computeOutput(s)
 
 		ps = s
 		s = s.next(*output)
+		i += 1
 
+def dist(a, b):
+	return abs(a.x - b.x) + abs(a.y - b.y)
+
+def searchPath():
+	global land
+	path = []
+	for x in range(0, 7000, 100):
+		lp = landingPoint(x)
+		lp = Point(lp[0], lp[1] + 1)
+		sp = Point(x, 2700)
+		# compute coefficiant directeur of the path
+		a = 10 if lp.x == sp.x else (lp.y - sp.y) / (lp.x - sp.x)
+
+		# get rid of the path that cross the land and the path that are not steep enough
+		if crossLand(sp, lp) is not None or abs(a) < 1:
+			continue
+		path.append((sp, lp, dist(sp, lp)))
+
+	# get rid of the path that are probably too close to some land
+	# path = path[5:-5]
+	return path
 
 draw = Draw()
 
@@ -265,17 +330,27 @@ surface_n = int(input())
 land = []
 for i in range(surface_n):
 	land_x, land_y = [int(j) for j in input().split()]
-	land.append((land_x, land_y))
+	land.append({"x": land_x,"y": land_y,"a": 0,"b": 0,"c": 0})
+
+# compute land equation (ax + by + c = 0)
+for i in range(len(land) - 1):
+	land[i]["a"] = land[i + 1]["y"] - land[i]["y"]
+	land[i]["b"] = land[i]["x"] - land[i + 1]["x"]
+	land[i]["c"] = land[i + 1]["x"] * land[i]["y"] - land[i]["x"] * land[i + 1]["y"]
 
 # get landing surface
 landingSurface = (0, 0, 0)
 for i in range(surface_n - 1):
-	if land[i][1] == land[i+1][1]:
+	if land[i]["y"] == land[i+1]["y"]:
 		landingSurface = {
-			"x1": land[i][0], 
-			"x2": land[i+1][0],
-			"y": land[i][1]
+			"x1": land[i]["x"], 
+			"x2": land[i+1]["x"],
+			"y": land[i]["y"]
 		}
+
+midDest: Point
+path = searchPath()
+hasReachedMidDest = False
 
 funcComputeOutput = computeOutput
 simuleValide = False
@@ -283,34 +358,61 @@ state = State(*[0]*7)
 
 step = 1
 while True:
+	start = time.time_ns()
 	x, y, h_speed, v_speed, fuel, rotate, power = [int(i) for i in input().split()]
 
-	# check if the compute state match the input state
+	# check if the compute state match t[0]he input state
 	if not state.checkValue(x, y, h_speed, v_speed, fuel, rotate + 90, power):
 		print("Change state to match input", file=sys.stderr, flush=True)
 		state = State(x, y, h_speed, v_speed, fuel, rotate + 90, power)
+	
+	# sort by distance to player
+	path.sort(key=lambda line: dist(line[0], state))
+	
+	# remove path that goes in the wrong direction and that are too close to the player
+	if step == 1:
+		lp = landingPoint(state.x)
+		playerDistFromLanding = dist(state, Point(*lp)) - 500
+		path = [line for line in path if line[2] < playerDistFromLanding]
+	
+	for line in path:
+		draw.line(line[0].x, line[0].y, line[1].x, line[1].y, 1, "#400040")
 
-
+	if not simuleValide and path:
+		midDest = path.pop(0)[0]
+	
 	print("Step", step, file=sys.stderr, flush=True)
 	print("  ", state, file=sys.stderr, flush=True)
 
-	if not simuleValide and simule(state, computeOutput, simuleLanding=True, debug=True, color="#700000"):
-		print("Base mode valide", flush=True, file=sys.stderr)
-		simuleValide = True
-	if funcComputeOutput != computeLanding and simule(state, computeLanding, simuleLanding=False, debug=True, color="#007070"):
-		print("Switch to landing mode", flush=True, file=sys.stderr)
+	# check if the lander reach the mid destination
+	if not hasReachedMidDest and math.sqrt((state.x - midDest.x)**2 + (state.y - midDest.y)**2) < 300:
+		print("   Reached mid dest", file=sys.stderr)
+		hasReachedMidDest = True
+
+	# if funcComputeOutput != computeLanding and simule(state, computeLanding, simuleLandingB=False, debug=True, color="#007070"):
+	if funcComputeOutput != computeLanding and simuleLanding(state, debug=True):
+		print("   Switch to landing mode", flush=True, file=sys.stderr)
 		funcComputeOutput = computeLanding
 		simuleValide = True
-	if not simuleValide and simule(state, oposingVector, simuleLanding=True, debug=True, color="#700070"):
-		print("Switch to oposing vector mode", flush=True, file=sys.stderr)
+	if not simuleValide and simule(state, computeOutput, simuleLandingB=True, debug=True, color="#ff0000"):
+		print("   Base mode valide", flush=True, file=sys.stderr)
+		simuleValide = True
+	if not simuleValide and simule(state, oposingVector, simuleLandingB=True, debug=True, color="#700070"):
+		print("   Switch to oposing vector mode", flush=True, file=sys.stderr)
 		funcComputeOutput = oposingVector
 		simuleValide = True
+
 	
-	simule(state, funcComputeOutput, simuleLanding=False, debug=True)
+	simule(state, funcComputeOutput, simuleLandingB=False, debug=True)
+	# print("   with", funcComputeOutput, file=sys.stderr, flush=True)
 	output = funcComputeOutput(state, debug=True)
 
+	if not path and not simuleValide:
+		output = (90, 4)
 	print(output[0] - 90, output[1], flush=True)
-	print("  ", output, flush=True, file=sys.stderr)
+	print("  ", output, (time.time_ns() - start) / 1000000, "ms", flush=True, file=sys.stderr)
+
+	draw.point(midDest.x, midDest.y, 5, "#ff0000")
 
 	state = state.next(*output)
 	draw.flush()

@@ -1,5 +1,6 @@
 # Mars Lander
-A copy of the Mars Lander puzzle from [Codingame](https://www.codingame.com/training/medium/mars-lander-episode-2), but with drawing features that make debugging more visual.
+A copy of the Mars Lander [ep1](https://www.codingame.com/training/medium/mars-lander-episode-1)/[ep2](https://www.codingame.com/training/medium/mars-lander-episode-2)/[ep3](https://www.codingame.com/training/medium/mars-lander-episode-3) puzzle from [Codingame](https://www.codingame.com/), but with drawing features that make debugging more visual.
+
 
 <br/>
 
@@ -57,3 +58,6 @@ Except for the drawing commands, the auto-generated codes provided by Codingame 
 In the ```yourSolution``` folder, I have written 2 main (in ```python``` and ```cpp```) which are copies of the ones on Codingame but with some extra lines which explain how to send the drawing commands depending on each language.
 
 If you want other languages, copy the code given by Codingame and add the necessary lines to send the drawing commands.
+
+<br/>
+<sub>README last update: 15/11/2022</sub>

@@ -87,7 +87,7 @@ class State:
 def round(n):
 	return int(n + (0.5 if n > 0 else -0.5))
 
-def crossLand(state, prevState):
+def crossLand_old(state, prevState):
 	global land
 	if prevState is None:
 		return None
@@ -105,6 +105,34 @@ def crossLand(state, prevState):
 			continue
 		x = (d - b) / (a - c)
 		y = a * x + b
+		if ((prevState.y <= y <= state.y or prevState.y >= y >= state.y)
+			and (prevState.x <= x <= state.x or prevState.x >= x >= state.x)
+			and (land[i]["x"] <= x <= land[i + 1]["x"] or land[i]["x"] >= x >= land[i + 1]["x"])
+			and (land[i]["y"] <= y <= land[i + 1]["y"] or land[i]["y"] >= y >= land[i + 1]["y"])):
+			return (x, y)
+	return None
+
+def crossLand(state, prevState):
+	global land
+	if prevState is None:
+		return None
+	for i in range(len(land) - 1):
+		# find the equation of the line
+		# ax + by + c = 0
+		a = land[i + 1]["y"] - land[i]["y"]
+		b = land[i]["x"] - land[i + 1]["x"]
+		c = land[i + 1]["x"] * land[i]["y"] - land[i]["x"] * land[i + 1]["y"]
+		# find the equation of the state line
+		# ax + by + c = 0
+		a2 = state.y - prevState.y
+		b2 = prevState.x - state.x
+		c2 = state.x * prevState.y - prevState.x * state.y
+		# find the intersection point
+		det = a * b2 - a2 * b
+		if det == 0:
+			continue
+		x = (b * c2 - b2 * c) / det
+		y = (a2 * c - a * c2) / det
 		if ((prevState.y <= y <= state.y or prevState.y >= y >= state.y)
 			and (prevState.x <= x <= state.x or prevState.x >= x >= state.x)
 			and (land[i]["x"] <= x <= land[i + 1]["x"] or land[i]["x"] >= x >= land[i + 1]["x"])
@@ -171,7 +199,7 @@ def simule(data, program):
 
 	while True:
 
-		intersection = crossLand(state, prevState)
+		intersection = crossLand_old(state, prevState)
 		if hasLanded(state, intersection):
 			print("\033[92mYou landed successfully!\033[0m", file=sys.stderr, flush=True)
 			break
